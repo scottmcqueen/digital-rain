@@ -1,6 +1,6 @@
 # Digital Rain screen saver (Metal)
 
-A native macOS screen saver with the same rain, bloom, phosphor trails and screen door as the web version.
+A native macOS screen saver of the Matrix's iconic Digital Rain with the same rain, bloom, phosphor trails and screen door as the web version.
 
 ## Build and install
 
