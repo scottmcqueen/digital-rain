@@ -1,0 +1,12 @@
+# macOS
+.DS_Store
+
+# Screen saver build output
+macos-screensaver/build/
+
+# Archives
+*.zip
+
+# Xcode, if you open the sources in it
+xcuserdata/
+DerivedData/
