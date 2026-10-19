@@ -8,6 +8,7 @@ final class DigitalRainView: ScreenSaverView {
     private var settings = RainSettings.load()
     private var configSheetController: ConfigSheet?
     private var stopped = false
+    private var pendingExit: DispatchWorkItem?
 
     override init?(frame: NSRect, isPreview: Bool) {
         super.init(frame: frame, isPreview: isPreview)
@@ -41,16 +42,36 @@ final class DigitalRainView: ScreenSaverView {
         renderer = r
 
         // Since macOS Sonoma, the screen saver host can keep running after the saver is
-        // dismissed. Stop drawing when it says it's stopping, and quit the host so it
-        // doesn't linger in the background using power.
-        DistributedNotificationCenter.default().addObserver(
-            self, selector: #selector(willStop(_:)),
-            name: Notification.Name("com.apple.screensaver.willstop"), object: nil)
+        // dismissed, and it may reuse this view next time without calling startAnimation.
+        // So drawing resumes on the system-wide "did start" signal, stops on "will stop",
+        // and the host quits shortly after stopping unless the saver starts again first.
+        let center = DistributedNotificationCenter.default()
+        center.addObserver(self, selector: #selector(willStop(_:)),
+                           name: Notification.Name("com.apple.screensaver.willstop"), object: nil)
+        center.addObserver(self, selector: #selector(didStart(_:)),
+                           name: Notification.Name("com.apple.screensaver.didstart"), object: nil)
+        NSLog("DigitalRain: view created (preview: \(isPreview))")
+    }
+
+    private func resume(_ reason: String) {
+        pendingExit?.cancel()
+        pendingExit = nil
+        stopped = false
+        NSLog("DigitalRain: drawing resumed (\(reason))")
     }
 
     override func startAnimation() {
         super.startAnimation()
-        stopped = false
+        resume("startAnimation")
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window != nil { resume("moved to window") }
+    }
+
+    @objc private func didStart(_ note: Notification) {
+        resume("didstart")
     }
 
     override func stopAnimation() {
@@ -70,9 +91,15 @@ final class DigitalRainView: ScreenSaverView {
 
     @objc private func willStop(_ note: Notification) {
         stopped = true
-        if !isPreview {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { exit(0) }
+        NSLog("DigitalRain: willstop received")
+        guard !isPreview else { return }
+        pendingExit?.cancel()
+        let work = DispatchWorkItem {
+            NSLog("DigitalRain: quitting screen saver host")
+            exit(0)
         }
+        pendingExit = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: work)
     }
 
     // MARK: Options sheet
